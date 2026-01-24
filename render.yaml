@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: plant-voice-backend
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: INFLUXDB_URL
+        sync: false
+      - key: INFLUXDB_TOKEN
+        sync: false
+      - key: INFLUXDB_ORG
+        sync: false
+      - key: INFLUXDB_BUCKET
+        sync: false
+      - key: API_SECRET_KEY
+        sync: false
+      - key: ALLOWED_DEVICE_IDS
+        sync: false
