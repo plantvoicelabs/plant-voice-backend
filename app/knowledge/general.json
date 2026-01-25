@@ -1,0 +1,21 @@
+{
+  "sensor_descriptions": {
+    "temperature": "Air temperature around the plant",
+    "humidity": "Relative air humidity level",
+    "light": "Light intensity reaching the plant",
+    "soil_moisture": "Water content in the soil as percentage of field capacity",
+    "ph": "Soil acidity or alkalinity level",
+    "tds": "Total dissolved solids in soil water, indicating nutrient concentration"
+  },
+  "status_meanings": {
+    "low": "Below optimal range",
+    "normal": "Within optimal range",
+    "high": "Above optimal range",
+    "error": "Sensor reading failed or invalid"
+  },
+  "severity_levels": {
+    "critical": "Immediate action required",
+    "warning": "Attention needed soon",
+    "normal": "All conditions are good"
+  }
+}

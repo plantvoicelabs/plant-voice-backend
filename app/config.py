@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     API_SECRET_KEY: str
     ALLOWED_DEVICE_IDS: str
     
+    # OpenRouter
+    OPENROUTER_API_KEY: str
+    
     # Server
     HOST: str = "0.0.0.0"
     PORT: int = 8000

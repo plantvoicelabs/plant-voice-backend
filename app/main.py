@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routes import sensors
+from app.routes import ai
 from app.config import settings
 import logging
 
@@ -13,8 +14,8 @@ logging.basicConfig(
 # Create FastAPI app
 app = FastAPI(
     title="Plant Voice Labs IoT Gateway",
-    description="Backend API for Plant Voice Labs sensor data ingestion",
-    version="1.0.0"
+    description="Backend API for Plant Voice Labs sensor data ingestion and AI interpretation",
+    version="2.0.0"
 )
 
 # CORS
@@ -28,12 +29,13 @@ app.add_middleware(
 
 # Include routers
 app.include_router(sensors.router)
+app.include_router(ai.router)
 
 @app.get("/")
 async def root():
     return {
         "message": "Plant Voice Labs IoT Gateway",
-        "version": "1.0.0",
+        "version": "2.0.0",
         "status": "operational"
     }
 
