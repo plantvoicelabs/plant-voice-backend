@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Header, status
-from app.models import SensorPayload
+from app.schemas import SensorPayload
 from app.services.influxdb import influxdb_service
 from app.config import settings
 import logging

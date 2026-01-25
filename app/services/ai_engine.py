@@ -13,6 +13,12 @@ class AIEngine:
         self.model = "anthropic/claude-sonnet-4"
     
     def generate_plant_response(self, plant_name: str, sensor_data: Dict) -> Dict:
+        return self._generate_response(plant_name, sensor_data, message_type="report")
+    
+    def generate_plant_response_scheduled(self, plant_name: str, sensor_data: Dict, message_type: str) -> Dict:
+        return self._generate_response(plant_name, sensor_data, message_type=message_type)
+    
+    def _generate_response(self, plant_name: str, sensor_data: Dict, message_type: str = "report") -> Dict:
         try:
             plant_knowledge = knowledge_service.get_plant_knowledge(plant_name)
             
@@ -24,7 +30,7 @@ class AIEngine:
             
             analysis = knowledge_service.analyze_all_sensors(plant_name, sensor_data)
             
-            prompt = self._build_prompt(plant_knowledge, sensor_data, analysis)
+            prompt = self._build_prompt(plant_knowledge, sensor_data, analysis, message_type)
             
             response = self._call_openrouter(prompt)
             
@@ -80,7 +86,7 @@ class AIEngine:
             logger.error(f"OpenRouter API error: {e}")
             return None
     
-    def _build_prompt(self, plant_knowledge: Dict, sensor_data: Dict, analysis: Dict) -> str:
+    def _build_prompt(self, plant_knowledge: Dict, sensor_data: Dict, analysis: Dict, message_type: str) -> str:
         plant_name = plant_knowledge.get("name", "Plant")
         scientific_name = plant_knowledge.get("scientific_name", "")
         
@@ -98,7 +104,31 @@ class AIEngine:
         sensor_text = "\n".join(sensor_summary)
         overall_severity = analysis.get("overall_severity", "normal")
         
-        prompt = f"""You are a {plant_name} ({scientific_name}) that can talk. Based on the sensor readings below, express how you feel in first person perspective. Be conversational, friendly, and helpful.
+        # Context based on message type
+        if message_type == "greeting_morning":
+            context = """This is a MORNING GREETING (6:00 AM). 
+Start by saying good morning and express how you feel waking up. 
+Then briefly mention your current conditions and what you need for the day ahead.
+Be cheerful and optimistic about the new day."""
+        
+        elif message_type == "greeting_night":
+            context = """This is a NIGHT GREETING (10:00 PM). 
+Say good night and summarize how your day was based on the conditions.
+Mention if you had a good day or faced challenges.
+End by saying you will rest now and see them tomorrow.
+Be calm and peaceful."""
+        
+        else:  # report
+            context = """This is a REGULAR STATUS REPORT. 
+Share your current condition based on the sensor readings.
+If something is wrong, explain what you need.
+If everything is good, express gratitude.
+Be conversational and helpful."""
+        
+        prompt = f"""You are a {plant_name} ({scientific_name}) that can talk. Based on the sensor readings below, express how you feel in first person perspective.
+
+MESSAGE TYPE CONTEXT:
+{context}
 
 Current sensor readings:
 {sensor_text}
@@ -112,11 +142,7 @@ Guidelines:
 - Give specific, actionable advice based on the readings
 - Keep response concise (2-4 sentences)
 - Do not use emojis
-
-Example responses:
-- Critical: "I am really struggling right now. The temperature is way too high at 38°C and I prefer 22-30°C. Please move me to a cooler spot or provide some shade immediately."
-- Warning: "I am feeling a bit thirsty. My soil moisture is at 55% but I prefer 70-80%. Could you give me some water soon?"
-- Normal: "I am feeling great today. All my conditions are within optimal range. Thank you for taking such good care of me."
+- Match your tone to the message type (morning=cheerful, night=peaceful, report=informative)
 
 Now respond as the plant:"""
         
