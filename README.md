@@ -21,6 +21,13 @@ Empowering everyone with affordable, AI-powered plant monitoring technology. No 
 |--------|----------|-------------|
 | POST | /api/v1/sensors/data | Receive sensor data from ESP32 |
 | GET | /api/v1/sensors/health | Health check |
+| GET | /api/v1/ai/interpret | Get AI interpretation of sensor data |
+| POST | /api/v1/speech/generate | Generate TTS audio from text |
+| GET | /api/v1/dashboard/status | Get dashboard status |
+| GET | /api/v1/dashboard/sensors | Get current sensor readings |
+| GET | /api/v1/dashboard/latest-message | Get latest AI message with audio |
+| GET | /api/v1/dashboard/history | Get 24-hour sensor history |
+| POST | /api/v1/dashboard/trigger-message | Manually trigger AI message |
 
 ## 🌡️ Sensors Supported
 
@@ -30,14 +37,23 @@ Empowering everyone with affordable, AI-powered plant monitoring technology. No 
 - TDS - Total Dissolved Solids
 - pH Level
 
+## 🤖 Features
+
+- **AI Interpretation**: Generates natural language responses based on sensor data and peer-reviewed agricultural research
+- **Voice Synthesis**: Converts AI messages to speech using ElevenLabs API
+- **Smart Scheduler**: Follows plant rhythms with morning greetings (6 AM), periodic reports (8 AM - 8 PM), goodnight messages (10 PM), and sleep mode overnight
+- **Real-time Dashboard API**: Provides endpoints for live sensor data, AI messages, and historical charts
+
 ## 🛠️ Development Status
 
 | Component | Status |
 |-----------|--------|
 | IoT Gateway | ✅ Done |
 | InfluxDB Integration | ✅ Done |
-| AI Engine | 🚧 In Progress |
-| Text-to-Speech | 📋 Planned |
+| AI Engine | ✅ Done |
+| Text-to-Speech | ✅ Done |
+| Smart Scheduler | ✅ Done |
+| Dashboard API | ✅ Done |
 
 ## 🌍 Why Open Source?
 
@@ -65,6 +81,8 @@ Create a `.env` file with:
 - INFLUXDB_BUCKET
 - API_SECRET_KEY
 - ALLOWED_DEVICE_IDS
+- OPENROUTER_API_KEY
+- ELEVENLABS_API_KEY
 
 ## 🤝 Contributing
 
