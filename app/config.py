@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     # OpenRouter
     OPENROUTER_API_KEY: str
     
+    # ElevenLabs
+    ELEVENLABS_API_KEY: str
+    
     # Server
     HOST: str = "0.0.0.0"
     PORT: int = 8000
