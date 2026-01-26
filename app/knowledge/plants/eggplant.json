@@ -32,29 +32,12 @@
       "critical_low": 50,
       "critical_high": 90,
       "source": "Ouma et al. (2024), Scientia Horticulturae, DOI: 10.1016/j.scienta.2023.112648"
-    },
-    "ph": {
-      "min": 5.5,
-      "max": 6.8,
-      "critical_low": 4.5,
-      "critical_high": 7.5,
-      "source": "Wang et al. (2025), Frontiers in Plant Science, DOI: 10.3389/fpls.2025.1558458"
-    },
-    "tds": {
-      "min": 900,
-      "max": 1400,
-      "unit": "ppm",
-      "critical_low": 500,
-      "critical_high": 1900,
-      "source": "Islam et al. (2024), Scientia Horticulturae, DOI: 10.1016/j.scienta.2024.113097"
     }
   },
   "references": [
     "Shimira, F., & Taşkın, H. (2022). Horticultural Studies. https://doi.org/10.16882/HortiS.1108342",
     "Caruso, G., et al. (2017). Eggplant flowering biology and pollen viability review.",
     "Ouma, J., et al. (2024). Scientia Horticulturae. https://doi.org/10.1016/j.scienta.2023.112648",
-    "Wang, X., et al. (2025). Frontiers in Plant Science. https://doi.org/10.3389/fpls.2025.1558458",
-    "Islam, M., et al. (2024). Scientia Horticulturae. https://doi.org/10.1016/j.scienta.2024.113097",
     "FAO Salinity yield response summary tables for crops."
   ]
 }
