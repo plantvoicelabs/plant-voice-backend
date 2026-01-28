@@ -203,6 +203,8 @@ def _generate_mock_history(hours: int) -> Dict:
 
 def _organize_history(history: List[Dict]) -> Dict:
     """Organize raw history data by sensor type"""
+    from datetime import datetime
+    import pytz
     
     data = {
         "labels": [],
@@ -214,24 +216,50 @@ def _organize_history(history: List[Dict]) -> Dict:
         "tds": []
     }
     
+    jakarta_tz = pytz.timezone('Asia/Jakarta')
+    utc_tz = pytz.UTC
+    
     # Group by time
     time_groups = {}
     for record in history:
-        time = record.get("time", "")[:16]  # Get YYYY-MM-DDTHH:MM
+        time_str = record.get("time", "")
         sensor = record.get("sensor_type")
         value = record.get("value")
         
-        if time not in time_groups:
-            time_groups[time] = {}
-        time_groups[time][sensor] = value
+        # Convert UTC to Jakarta timezone
+        try:
+            if time_str:
+                # Parse UTC time
+                if time_str.endswith('Z'):
+                    time_str = time_str[:-1]
+                utc_time = datetime.fromisoformat(time_str)
+                if utc_time.tzinfo is None:
+                    utc_time = utc_tz.localize(utc_time)
+                # Convert to Jakarta
+                jakarta_time = utc_time.astimezone(jakarta_tz)
+                time_key = jakarta_time.strftime("%Y-%m-%dT%H:%M")
+            else:
+                continue
+        except Exception as e:
+            logger.error(f"Failed to parse time: {time_str}, error: {e}")
+            continue
+        
+        if time_key not in time_groups:
+            time_groups[time_key] = {}
+        time_groups[time_key][sensor] = value
     
     # Convert to arrays
-    for time in sorted(time_groups.keys()):
-        # Extract hour:minute for label
-        label = time[11:16] if len(time) > 11 else time
+    for time_key in sorted(time_groups.keys()):
+        # Format label as DD/MM HH:MM for better readability
+        try:
+            dt = datetime.fromisoformat(time_key)
+            label = dt.strftime("%d/%m %H:%M")
+        except:
+            label = time_key[11:16] if len(time_key) > 11 else time_key
+        
         data["labels"].append(label)
         
-        sensors = time_groups[time]
+        sensors = time_groups[time_key]
         data["temperature"].append(sensors.get("temperature", 0))
         data["humidity"].append(sensors.get("humidity", 0))
         data["soil_moisture"].append(sensors.get("soil_moisture", 0))
