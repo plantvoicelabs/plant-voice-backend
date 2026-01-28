@@ -134,27 +134,29 @@ class PlantScheduler:
         return "06:00"
     
     def start(self):
-        # Morning greeting - 06:00
+        jakarta_tz = pytz.timezone('Asia/Jakarta')
+        
+        # Morning greeting - 06:00 WIB
         self.scheduler.add_job(
             self.generate_scheduled_message,
-            CronTrigger(hour=6, minute=0),
+            CronTrigger(hour=6, minute=0, timezone=jakarta_tz),
             args=["greeting_morning"],
             id="greeting_morning"
         )
         
-        # Regular reports - 08:00, 10:00, 12:00, 14:00, 16:00, 18:00, 20:00
+        # Regular reports - 08:00, 10:00, 12:00, 14:00, 16:00, 18:00, 20:00 WIB
         for hour in [8, 10, 12, 14, 16, 18, 20]:
             self.scheduler.add_job(
                 self.generate_scheduled_message,
-                CronTrigger(hour=hour, minute=0),
+                CronTrigger(hour=hour, minute=0, timezone=jakarta_tz),
                 args=["report"],
                 id=f"report_{hour}"
             )
         
-        # Night greeting - 22:00
+        # Night greeting - 22:00 WIB
         self.scheduler.add_job(
             self.generate_scheduled_message,
-            CronTrigger(hour=22, minute=0),
+            CronTrigger(hour=22, minute=0, timezone=jakarta_tz),
             args=["greeting_night"],
             id="greeting_night"
         )
