@@ -17,7 +17,7 @@ DEVICE_ID = "PVL-001"
 PLANT_NAME = "eggplant"
 
 # Experiment start date 
-EXPERIMENT_START_DATE = datetime(2025, 1, 28, tzinfo=pytz.timezone('Asia/Jakarta'))
+EXPERIMENT_START_DATE = datetime(2026, 1, 26, tzinfo=pytz.timezone('Asia/Jakarta'))
 
 def get_experiment_day():
     """Calculate current experiment day"""
