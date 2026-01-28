@@ -19,6 +19,7 @@ PLANT_NAME = "eggplant"
 @router.get("/sensors")
 async def get_current_sensors():
     """Get current sensor readings from ESP32"""
+    from app.services.growth_phase import get_current_phase, analyze_sensor_for_phase
     
     sensor_data = influxdb_service.get_latest_readings(DEVICE_ID)
     
@@ -36,9 +37,26 @@ async def get_current_sensors():
     else:
         is_live = True
     
-    # Get status for each sensor
-    from app.services.knowledge import knowledge_service
-    analysis = knowledge_service.analyze_all_sensors(PLANT_NAME, sensor_data)
+    # Get current growth phase
+    phase = get_current_phase()
+    
+    # Analyze sensors based on current growth phase
+    phase_analysis = {}
+    sensor_keys = ["temperature", "humidity", "light", "soil_moisture"]
+    
+    for key in sensor_keys:
+        if key in sensor_data and sensor_data[key].get("value") is not None:
+            value = sensor_data[key]["value"]
+            phase_analysis[key] = analyze_sensor_for_phase(key, value)
+    
+    # Calculate overall severity
+    severities = [s.get("severity", "normal") for s in phase_analysis.values()]
+    if "critical" in severities:
+        overall_severity = "critical"
+    elif "warning" in severities:
+        overall_severity = "warning"
+    else:
+        overall_severity = "normal"
     
     return {
         "success": True,
@@ -47,7 +65,15 @@ async def get_current_sensors():
         "plant_name": PLANT_NAME,
         "timestamp": datetime.now(pytz.timezone('Asia/Jakarta')).isoformat(),
         "sensors": sensor_data,
-        "analysis": analysis
+        "phase": {
+            "name": phase["name"],
+            "description": phase["description"],
+            "tips": phase["tips"]
+        },
+        "analysis": {
+            "sensors": phase_analysis,
+            "overall_severity": overall_severity
+        }
     }
 
 @router.get("/latest-message")
