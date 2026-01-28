@@ -16,6 +16,15 @@ router = APIRouter(prefix="/api/v1/dashboard", tags=["dashboard"])
 DEVICE_ID = "PVL-001"
 PLANT_NAME = "eggplant"
 
+# Experiment start date 
+EXPERIMENT_START_DATE = datetime(2025, 1, 28, tzinfo=pytz.timezone('Asia/Jakarta'))
+
+def get_experiment_day():
+    """Calculate current experiment day"""
+    now = datetime.now(pytz.timezone('Asia/Jakarta'))
+    delta = now - EXPERIMENT_START_DATE
+    return delta.days + 1
+
 @router.get("/sensors")
 async def get_current_sensors():
     """Get current sensor readings from ESP32"""
@@ -63,6 +72,7 @@ async def get_current_sensors():
         "is_live": is_live,
         "device_id": DEVICE_ID,
         "plant_name": PLANT_NAME,
+        "experiment_day": get_experiment_day(),
         "timestamp": datetime.now(pytz.timezone('Asia/Jakarta')).isoformat(),
         "sensors": sensor_data,
         "phase": {
@@ -115,6 +125,10 @@ async def get_latest_message():
 @router.get("/history")
 async def get_sensor_history(hours: int = 24):
     """Get sensor history for charts"""
+    
+    # Validate hours parameter (24h, 7d=168h, 30d=720h)
+    if hours not in [24, 168, 720]:
+        hours = 24
     
     history = influxdb_service.get_readings_history(DEVICE_ID, hours)
     
