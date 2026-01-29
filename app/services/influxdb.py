@@ -128,6 +128,68 @@ class InfluxDBService:
             logger.error(f"Failed to query history from InfluxDB: {e}")
             return []
     
+    def get_hourly_stats(self, device_id: str, hours: int = 24) -> list:
+        """Get hourly statistics (min, max, mean) for pattern analysis"""
+        try:
+            query = f'''
+                from(bucket: "{self.bucket}")
+                |> range(start: -{hours}h)
+                |> filter(fn: (r) => r["device_id"] == "{device_id}")
+                |> filter(fn: (r) => r["_field"] == "value")
+                |> aggregateWindow(every: 1h, fn: mean, createEmpty: false)
+            '''
+            
+            tables = self.query_api.query(query, org=settings.INFLUXDB_ORG)
+            
+            hourly_data = []
+            
+            for table in tables:
+                for record in table.records:
+                    hourly_data.append({
+                        "time": record.get_time().isoformat(),
+                        "hour": record.get_time().hour,
+                        "sensor_type": record.values.get("sensor_type"),
+                        "value": record.get_value()
+                    })
+            
+            logger.info(f"Retrieved {len(hourly_data)} hourly stats for {device_id}")
+            return hourly_data
+            
+        except Exception as e:
+            logger.error(f"Failed to get hourly stats: {e}")
+            return []
+    
+    def get_daily_stats(self, device_id: str, days: int = 7) -> list:
+        """Get daily statistics for weekly pattern analysis"""
+        try:
+            query = f'''
+                from(bucket: "{self.bucket}")
+                |> range(start: -{days}d)
+                |> filter(fn: (r) => r["device_id"] == "{device_id}")
+                |> filter(fn: (r) => r["_field"] == "value")
+                |> aggregateWindow(every: 1d, fn: mean, createEmpty: false)
+            '''
+            
+            tables = self.query_api.query(query, org=settings.INFLUXDB_ORG)
+            
+            daily_data = []
+            
+            for table in tables:
+                for record in table.records:
+                    daily_data.append({
+                        "time": record.get_time().isoformat(),
+                        "date": record.get_time().strftime("%Y-%m-%d"),
+                        "sensor_type": record.values.get("sensor_type"),
+                        "value": record.get_value()
+                    })
+            
+            logger.info(f"Retrieved {len(daily_data)} daily stats for {device_id}")
+            return daily_data
+            
+        except Exception as e:
+            logger.error(f"Failed to get daily stats: {e}")
+            return []
+    
     def close(self):
         self.client.close()
 

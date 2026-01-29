@@ -152,6 +152,52 @@ async def get_sensor_history(hours: int = 24):
         "data": organized
     }
 
+@router.get("/insights")
+async def get_latest_insight():
+    """Get latest AI insight"""
+    
+    insight = plant_scheduler.get_latest_insight()
+    
+    if not insight:
+        return {
+            "success": True,
+            "has_insight": False,
+            "insight": None
+        }
+    
+    return {
+        "success": True,
+        "has_insight": True,
+        "insight": insight
+    }
+
+@router.post("/insights/generate")
+async def trigger_insight_generation(insight_type: str = "daily"):
+    """Manually trigger insight generation (for testing)"""
+    
+    if insight_type == "daily":
+        await plant_scheduler.generate_daily_insight()
+    elif insight_type == "weekly":
+        await plant_scheduler.generate_weekly_insight()
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid insight type. Use: daily or weekly"
+        )
+    
+    insight = plant_scheduler.get_latest_insight()
+    
+    if not insight:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to generate insight"
+        )
+    
+    return {
+        "success": True,
+        "insight": insight
+    }
+
 @router.get("/status")
 async def get_dashboard_status():
     """Get overall dashboard status"""

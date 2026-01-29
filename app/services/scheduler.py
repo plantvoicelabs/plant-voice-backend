@@ -13,9 +13,12 @@ class PlantScheduler:
     def __init__(self):
         self.scheduler = AsyncIOScheduler(timezone=pytz.timezone('Asia/Jakarta'))
         self.latest_message = None
+        self.latest_insight = None
         self.messages_file = os.path.join(os.path.dirname(__file__), "..", "..", "messages.json")
+        self.insights_file = os.path.join(os.path.dirname(__file__), "..", "..", "insights.json")
         self.device_id = "PVL-001"
         self._load_latest_message()
+        self._load_latest_insight()
     
     def _load_latest_message(self):
         try:
@@ -32,6 +35,22 @@ class PlantScheduler:
                 json.dump(self.latest_message, f, default=str)
         except Exception as e:
             logger.error(f"Failed to save latest message: {e}")
+    
+    def _load_latest_insight(self):
+        try:
+            if os.path.exists(self.insights_file):
+                with open(self.insights_file, "r", encoding="utf-8") as f:
+                    self.latest_insight = json.load(f)
+        except Exception as e:
+            logger.error(f"Failed to load latest insight: {e}")
+            self.latest_insight = None
+    
+    def _save_latest_insight(self):
+        try:
+            with open(self.insights_file, "w", encoding="utf-8") as f:
+                json.dump(self.latest_insight, f, default=str)
+        except Exception as e:
+            logger.error(f"Failed to save latest insight: {e}")
     
     async def generate_scheduled_message(self, message_type: str):
         try:
@@ -114,6 +133,109 @@ class PlantScheduler:
     def get_latest_message(self):
         return self.latest_message
     
+    def get_latest_insight(self):
+        return self.latest_insight
+    
+    async def generate_daily_insight(self):
+        """Generate daily AI insight from pattern analysis"""
+        try:
+            from app.services.influxdb import influxdb_service
+            from app.services.pattern_analyzer import pattern_analyzer
+            from app.services.ai_engine import ai_engine
+            from app.services.growth_phase import get_current_phase
+            
+            logger.info("Generating daily insight...")
+            
+            # Get hourly data for last 24 hours
+            hourly_data = influxdb_service.get_hourly_stats(self.device_id, hours=24)
+            
+            if not hourly_data:
+                logger.warning("No hourly data available for daily insight")
+                return
+            
+            # Analyze patterns
+            pattern_analysis = pattern_analyzer.analyze_daily_patterns(hourly_data)
+            
+            if not pattern_analysis.get("success"):
+                logger.error(f"Pattern analysis failed: {pattern_analysis.get('error')}")
+                return
+            
+            # Get current phase
+            phase = get_current_phase()
+            
+            # Generate AI insight
+            insight_result = ai_engine.generate_daily_insight(pattern_analysis, phase)
+            
+            if not insight_result.get("success"):
+                logger.error(f"Insight generation failed: {insight_result.get('error')}")
+                return
+            
+            # Save insight
+            self.latest_insight = {
+                "id": str(uuid.uuid4()),
+                "timestamp": datetime.now(pytz.timezone('Asia/Jakarta')).isoformat(),
+                "type": "daily",
+                "insight": insight_result.get("insight"),
+                "analysis": pattern_analysis,
+                "phase": phase["name"]
+            }
+            
+            self._save_latest_insight()
+            logger.info("Daily insight generated and saved")
+            
+        except Exception as e:
+            logger.error(f"Daily insight generation error: {e}")
+    
+    async def generate_weekly_insight(self):
+        """Generate weekly AI insight from pattern analysis"""
+        try:
+            from app.services.influxdb import influxdb_service
+            from app.services.pattern_analyzer import pattern_analyzer
+            from app.services.ai_engine import ai_engine
+            from app.services.growth_phase import get_current_phase
+            
+            logger.info("Generating weekly insight...")
+            
+            # Get daily data for last 7 days
+            daily_data = influxdb_service.get_daily_stats(self.device_id, days=7)
+            
+            if not daily_data:
+                logger.warning("No daily data available for weekly insight")
+                return
+            
+            # Analyze patterns
+            pattern_analysis = pattern_analyzer.analyze_weekly_patterns(daily_data)
+            
+            if not pattern_analysis.get("success"):
+                logger.error(f"Weekly pattern analysis failed: {pattern_analysis.get('error')}")
+                return
+            
+            # Get current phase
+            phase = get_current_phase()
+            
+            # Generate AI insight
+            insight_result = ai_engine.generate_weekly_insight(pattern_analysis, phase)
+            
+            if not insight_result.get("success"):
+                logger.error(f"Weekly insight generation failed: {insight_result.get('error')}")
+                return
+            
+            # Save insight
+            self.latest_insight = {
+                "id": str(uuid.uuid4()),
+                "timestamp": datetime.now(pytz.timezone('Asia/Jakarta')).isoformat(),
+                "type": "weekly",
+                "insight": insight_result.get("insight"),
+                "analysis": pattern_analysis,
+                "phase": phase["name"]
+            }
+            
+            self._save_latest_insight()
+            logger.info("Weekly insight generated and saved")
+            
+        except Exception as e:
+            logger.error(f"Weekly insight generation error: {e}")
+    
     def is_sleeping_time(self):
         now = datetime.now(pytz.timezone('Asia/Jakarta'))
         hour = now.hour
@@ -161,8 +283,22 @@ class PlantScheduler:
             id="greeting_night"
         )
         
+        # Daily insight - 06:05 WIB (after morning greeting)
+        self.scheduler.add_job(
+            self.generate_daily_insight,
+            CronTrigger(hour=6, minute=5, timezone=jakarta_tz),
+            id="daily_insight"
+        )
+        
+        # Weekly insight - Monday 06:10 WIB
+        self.scheduler.add_job(
+            self.generate_weekly_insight,
+            CronTrigger(day_of_week='mon', hour=6, minute=10, timezone=jakarta_tz),
+            id="weekly_insight"
+        )
+        
         self.scheduler.start()
-        logger.info("Plant scheduler started with 9 daily jobs")
+        logger.info("Plant scheduler started with 11 jobs (9 messages + 2 insights)")
     
     def stop(self):
         self.scheduler.shutdown()

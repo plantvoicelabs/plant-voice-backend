@@ -252,5 +252,138 @@ Now generate the plant voice message:"""
         elif "warning" in severities:
             return "warning"
         return "normal"
+    
+    def generate_daily_insight(self, pattern_analysis: Dict, phase: Dict) -> Dict:
+        """Generate AI insight from daily pattern analysis"""
+        try:
+            prompt = self._build_insight_prompt(pattern_analysis, phase, "daily")
+            response = self._call_openrouter(prompt)
+            
+            if response is None:
+                return {"success": False, "error": "Failed to generate insight"}
+            
+            return {
+                "success": True,
+                "type": "daily",
+                "insight": response,
+                "analysis": pattern_analysis
+            }
+        except Exception as e:
+            logger.error(f"Failed to generate daily insight: {e}")
+            return {"success": False, "error": str(e)}
+    
+    def generate_weekly_insight(self, pattern_analysis: Dict, phase: Dict) -> Dict:
+        """Generate AI insight from weekly pattern analysis"""
+        try:
+            prompt = self._build_insight_prompt(pattern_analysis, phase, "weekly")
+            response = self._call_openrouter(prompt)
+            
+            if response is None:
+                return {"success": False, "error": "Failed to generate insight"}
+            
+            return {
+                "success": True,
+                "type": "weekly",
+                "insight": response,
+                "analysis": pattern_analysis
+            }
+        except Exception as e:
+            logger.error(f"Failed to generate weekly insight: {e}")
+            return {"success": False, "error": str(e)}
+    
+    def _build_insight_prompt(self, pattern_analysis: Dict, phase: Dict, insight_type: str) -> str:
+        """Build prompt for generating insights"""
+        
+        sensors = pattern_analysis.get("sensors", {})
+        patterns = pattern_analysis.get("patterns", [])
+        anomalies = pattern_analysis.get("anomalies", [])
+        correlations = pattern_analysis.get("correlations", [])
+        trends = pattern_analysis.get("trends", [])
+        
+        period = "24 hours" if insight_type == "daily" else "7 days"
+        
+        # Format sensor stats
+        sensor_stats = ""
+        for sensor_name, stats in sensors.items():
+            sensor_stats += f"""
+{sensor_name.upper()}:
+  - Range: {stats.get('min')} to {stats.get('max')}
+  - Average: {stats.get('avg')}
+  - Trend: {stats.get('trend')}
+  - Peak hour: {stats.get('peak_hour', 'N/A')}:00
+  - Low hour: {stats.get('low_hour', 'N/A')}:00
+"""
+        
+        # Format patterns
+        patterns_text = ""
+        if patterns:
+            patterns_text = "PATTERNS DETECTED:\n"
+            for p in patterns:
+                patterns_text += f"  - {p.get('description', '')}\n"
+        
+        # Format anomalies
+        anomalies_text = ""
+        if anomalies:
+            anomalies_text = "ANOMALIES DETECTED:\n"
+            for a in anomalies:
+                anomalies_text += f"  - {a.get('description', '')}\n"
+        
+        # Format correlations
+        correlations_text = ""
+        if correlations:
+            correlations_text = "CORRELATIONS:\n"
+            for c in correlations:
+                correlations_text += f"  - {c.get('description', '')}\n"
+        
+        # Format trends (for weekly)
+        trends_text = ""
+        if trends:
+            trends_text = "WEEKLY TRENDS:\n"
+            for t in trends:
+                trends_text += f"  - {t.get('description', '')}\n"
+        
+        prompt = f"""You are an AI agricultural analyst for Plant Voice Labs. Generate a concise, insightful analysis based on the sensor data patterns.
+
+═══════════════════════════════════════════════════════════════
+ANALYSIS PERIOD: Last {period}
+CURRENT GROWTH PHASE: {phase.get('name', 'unknown').upper()}
+═══════════════════════════════════════════════════════════════
+
+SENSOR STATISTICS:
+{sensor_stats}
+
+{patterns_text}
+{anomalies_text}
+{correlations_text}
+{trends_text}
+
+═══════════════════════════════════════════════════════════════
+INSTRUCTIONS
+═══════════════════════════════════════════════════════════════
+
+Generate an insight report with the following structure:
+
+1. SUMMARY (1-2 sentences): Overall condition summary for the past {period}
+
+2. KEY FINDINGS (2-4 bullet points): Most important observations
+   - Focus on trends, patterns, and correlations
+   - Mention any anomalies if detected
+   - Relate findings to the {phase.get('name', '')} growth phase
+
+3. RECOMMENDATIONS (1-2 bullet points): Actionable suggestions based on the data
+   - Be specific and practical
+   - Prioritize by importance
+
+RULES:
+- Be concise and data-driven
+- Use plain language, avoid excessive jargon
+- Focus on actionable insights
+- If data is limited, acknowledge it
+- Do not invent data that is not provided
+- Keep total response under 200 words
+
+Generate the insight now:"""
+        
+        return prompt
 
 ai_engine = AIEngine()
