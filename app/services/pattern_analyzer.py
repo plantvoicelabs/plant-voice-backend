@@ -38,8 +38,15 @@ class PatternAnalyzer:
             "correlations": []
         }
         
+        # Sensors to analyze (exclude pH and TDS as they are not active)
+        active_sensors = ["temperature", "humidity", "light", "soil_moisture"]
+        
         # Analyze each sensor
         for sensor_name, data in sensors.items():
+            # Skip inactive sensors
+            if sensor_name not in active_sensors:
+                continue
+                
             if len(data) < 2:
                 continue
                 
@@ -107,7 +114,14 @@ class PatternAnalyzer:
             "patterns": []
         }
         
+        # Sensors to analyze (exclude pH and TDS as they are not active)
+        active_sensors = ["temperature", "humidity", "light", "soil_moisture"]
+        
         for sensor_name, data in sensors.items():
+            # Skip inactive sensors
+            if sensor_name not in active_sensors:
+                continue
+                
             if len(data) < 2:
                 continue
             
