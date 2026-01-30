@@ -87,7 +87,7 @@ class GrowthComparator:
             optimal_center = (optimal_min + optimal_max) / 2
             
             deviation = self._calculate_deviation(temp_avg, optimal_min, optimal_max, optimal_center)
-            status = self._get_status(temp_avg, temp_thresholds)
+            status = self._get_status(temp_avg, temp_thresholds, "temperature", phase_data.get("name", ""))
             
             comparisons["temperature"] = {
                 "current_avg": round(temp_avg, 1),
@@ -108,7 +108,7 @@ class GrowthComparator:
             optimal_center = (optimal_min + optimal_max) / 2
             
             deviation = self._calculate_deviation(humid_avg, optimal_min, optimal_max, optimal_center)
-            status = self._get_status(humid_avg, humid_thresholds)
+            status = self._get_status(humid_avg, humid_thresholds, "humidity", phase_data.get("name", ""))
             
             comparisons["humidity"] = {
                 "current_avg": round(humid_avg, 1),
@@ -129,7 +129,7 @@ class GrowthComparator:
             optimal_center = (optimal_min + optimal_max) / 2
             
             deviation = self._calculate_deviation(soil_avg, optimal_min, optimal_max, optimal_center)
-            status = self._get_status(soil_avg, soil_thresholds)
+            status = self._get_status(soil_avg, soil_thresholds, "soil_moisture", phase_data.get("name", ""))
             
             comparisons["soil_moisture"] = {
                 "current_avg": round(soil_avg, 1),
@@ -150,7 +150,7 @@ class GrowthComparator:
             optimal_center = (optimal_min + optimal_max) / 2
             
             deviation = self._calculate_deviation(light_avg, optimal_min, optimal_max, optimal_center)
-            status = self._get_status(light_avg, light_thresholds)
+            status = self._get_status(light_avg, light_thresholds, "light", phase_data.get("name", ""))
             
             comparisons["light"] = {
                 "current_avg": round(light_avg, 1),
@@ -279,7 +279,7 @@ class GrowthComparator:
             return 0
         return round(((value - optimal_center) / optimal_center) * 100, 1)
     
-    def _get_status(self, value: float, thresholds: Dict) -> str:
+    def _get_status(self, value: float, thresholds: Dict, sensor_name: str = "", phase_name: str = "") -> str:
         """Determine status based on thresholds"""
         critical_low = thresholds.get("critical_low", 0)
         low = thresholds.get("low", 0)
@@ -287,6 +287,15 @@ class GrowthComparator:
         optimal_max = thresholds.get("optimal_max", 100)
         high = thresholds.get("high", 100)
         critical_high = thresholds.get("critical_high", 100)
+        
+        # Special handling for light during germination
+        if sensor_name == "light" and phase_name == "germination":
+            if value <= optimal_max:
+                return "optimal"
+            elif value <= high:
+                return "slightly_high"
+            else:
+                return "high"
         
         if value <= critical_low:
             return "critical_low"

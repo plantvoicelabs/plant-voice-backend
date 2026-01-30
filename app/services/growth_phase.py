@@ -352,6 +352,28 @@ def analyze_sensor_for_phase(sensor_name: str, value: float):
     sensor_display = sensor_name.replace("_", " ").title()
     phase_name = phase["name"]
     
+    # Special handling for light during germination
+    # Seeds prefer darkness, so low light (including 0) is actually optimal
+    if sensor_name == "light" and phase_name == "germination":
+        if value <= optimal_max:
+            return {
+                "status": "optimal",
+                "severity": "normal",
+                "message": f"Light is perfect for {phase_name} phase. Seeds prefer darkness."
+            }
+        elif value <= high:
+            return {
+                "status": "slightly_high",
+                "severity": "warning",
+                "message": f"Light is slightly above optimal for {phase_name} phase. Seeds prefer darkness."
+            }
+        else:
+            return {
+                "status": "high",
+                "severity": "warning",
+                "message": f"Light is too high for {phase_name} phase. Seeds need darkness to germinate."
+            }
+    
     # Determine status based on thresholds
     if value <= critical_low:
         return {
