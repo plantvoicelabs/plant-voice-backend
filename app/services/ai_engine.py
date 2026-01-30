@@ -302,9 +302,15 @@ Now generate the plant voice message:"""
         
         period = "24 hours" if insight_type == "daily" else "7 days"
         
+        # Active sensors only (exclude pH and TDS as they are not active)
+        active_sensors = ["temperature", "humidity", "light", "soil_moisture"]
+        
         # Format sensor stats
         sensor_stats = ""
         for sensor_name, stats in sensors.items():
+            # Skip inactive sensors
+            if sensor_name not in active_sensors:
+                continue
             sensor_stats += f"""
 {sensor_name.upper()}:
   - Range: {stats.get('min')} to {stats.get('max')}
@@ -381,6 +387,7 @@ RULES:
 - If data is limited, acknowledge it
 - Do not invent data that is not provided
 - Keep total response under 200 words
+- IMPORTANT: Only analyze temperature, humidity, light, and soil_moisture sensors. Do NOT mention pH or TDS sensors as they are not active in this experiment.
 
 Generate the insight now:"""
         
