@@ -14,11 +14,14 @@ class PlantScheduler:
         self.scheduler = AsyncIOScheduler(timezone=pytz.timezone('Asia/Jakarta'))
         self.latest_message = None
         self.latest_insight = None
+        self.latest_comparison = None
         self.messages_file = os.path.join(os.path.dirname(__file__), "..", "..", "messages.json")
         self.insights_file = os.path.join(os.path.dirname(__file__), "..", "..", "insights.json")
+        self.comparison_file = os.path.join(os.path.dirname(__file__), "..", "..", "comparison.json")
         self.device_id = "PVL-001"
         self._load_latest_message()
         self._load_latest_insight()
+        self._load_latest_comparison()
     
     def _load_latest_message(self):
         try:
@@ -51,6 +54,22 @@ class PlantScheduler:
                 json.dump(self.latest_insight, f, default=str)
         except Exception as e:
             logger.error(f"Failed to save latest insight: {e}")
+    
+    def _load_latest_comparison(self):
+        try:
+            if os.path.exists(self.comparison_file):
+                with open(self.comparison_file, "r", encoding="utf-8") as f:
+                    self.latest_comparison = json.load(f)
+        except Exception as e:
+            logger.error(f"Failed to load latest comparison: {e}")
+            self.latest_comparison = None
+    
+    def _save_latest_comparison(self):
+        try:
+            with open(self.comparison_file, "w", encoding="utf-8") as f:
+                json.dump(self.latest_comparison, f, default=str)
+        except Exception as e:
+            logger.error(f"Failed to save latest comparison: {e}")
     
     async def generate_scheduled_message(self, message_type: str):
         try:
@@ -135,6 +154,81 @@ class PlantScheduler:
     
     def get_latest_insight(self):
         return self.latest_insight
+    
+    def get_latest_comparison(self):
+        return self.latest_comparison
+    
+    async def generate_growth_comparison(self):
+        """Generate daily growth comparison with benchmark"""
+        try:
+            from app.services.influxdb import influxdb_service
+            from app.services.pattern_analyzer import pattern_analyzer
+            from app.services.growth_comparator import growth_comparator
+            from app.services.growth_phase import get_current_phase
+            from app.routes.dashboard import get_experiment_day
+            
+            logger.info("Generating growth comparison...")
+            
+            # Get hourly data for last 24 hours (for sensor averages)
+            hourly_data = influxdb_service.get_hourly_stats(self.device_id, hours=24)
+            
+            if not hourly_data:
+                logger.warning("No hourly data available for comparison")
+                return
+            
+            # Get daily data for GDD calculation
+            daily_data = influxdb_service.get_daily_stats(self.device_id, days=7)
+            
+            # Analyze patterns to get sensor stats
+            pattern_analysis = pattern_analyzer.analyze_daily_patterns(hourly_data)
+            sensor_stats = pattern_analysis.get("sensors", {})
+            
+            # Get current phase
+            phase = get_current_phase()
+            
+            # Get experiment day
+            experiment_day = get_experiment_day()
+            
+            # Calculate accumulated GDD
+            daily_temps = []
+            for record in daily_data:
+                if record.get("sensor_type") == "temperature":
+                    daily_temps.append(record.get("value", 0))
+            
+            accumulated_gdd = growth_comparator.calculate_accumulated_gdd(daily_temps)
+            
+            # Compare with benchmark
+            comparisons = growth_comparator.compare_with_benchmark(
+                sensor_stats=sensor_stats,
+                phase_data=phase,
+                experiment_day=experiment_day,
+                accumulated_gdd=accumulated_gdd
+            )
+            
+            # Calculate overall score
+            overall = growth_comparator.calculate_overall_score(comparisons)
+            
+            # Generate recommendation
+            recommendation = growth_comparator.generate_recommendation(comparisons, phase)
+            
+            # Save comparison
+            self.latest_comparison = {
+                "id": str(uuid.uuid4()),
+                "timestamp": datetime.now(pytz.timezone('Asia/Jakarta')).isoformat(),
+                "experiment_day": experiment_day,
+                "phase": phase["name"],
+                "comparisons": comparisons,
+                "overall_score": overall["score"],
+                "overall_status": overall["status"],
+                "recommendation": recommendation,
+                "accumulated_gdd": accumulated_gdd
+            }
+            
+            self._save_latest_comparison()
+            logger.info(f"Growth comparison generated. Score: {overall['score']}/100")
+            
+        except Exception as e:
+            logger.error(f"Growth comparison generation error: {e}")
     
     async def generate_daily_insight(self):
         """Generate daily AI insight from pattern analysis"""
@@ -297,8 +391,15 @@ class PlantScheduler:
             id="weekly_insight"
         )
         
+        # Growth comparison - Daily 06:15 WIB
+        self.scheduler.add_job(
+            self.generate_growth_comparison,
+            CronTrigger(hour=6, minute=15, timezone=jakarta_tz),
+            id="growth_comparison"
+        )
+        
         self.scheduler.start()
-        logger.info("Plant scheduler started with 11 jobs (9 messages + 2 insights)")
+        logger.info("Plant scheduler started with 12 jobs (9 messages + 2 insights + 1 comparison)")
     
     def stop(self):
         self.scheduler.shutdown()

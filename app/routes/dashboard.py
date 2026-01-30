@@ -152,6 +152,44 @@ async def get_sensor_history(hours: int = 24):
         "data": organized
     }
 
+@router.get("/comparison")
+async def get_latest_comparison():
+    """Get latest growth comparison"""
+    
+    comparison = plant_scheduler.get_latest_comparison()
+    
+    if not comparison:
+        return {
+            "success": True,
+            "has_comparison": False,
+            "comparison": None
+        }
+    
+    return {
+        "success": True,
+        "has_comparison": True,
+        "comparison": comparison
+    }
+
+@router.post("/comparison/generate")
+async def trigger_comparison_generation():
+    """Manually trigger growth comparison generation (for testing)"""
+    
+    await plant_scheduler.generate_growth_comparison()
+    
+    comparison = plant_scheduler.get_latest_comparison()
+    
+    if not comparison:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to generate comparison"
+        )
+    
+    return {
+        "success": True,
+        "comparison": comparison
+    }
+
 @router.get("/insights")
 async def get_latest_insight():
     """Get latest AI insight"""
