@@ -398,11 +398,187 @@ class PlantScheduler:
             id="growth_comparison"
         )
         
+        # Moltbook daily post - 18:00 WIB
+        self.scheduler.add_job(
+            self.post_daily_moltbook,
+            CronTrigger(hour=18, minute=0, timezone=jakarta_tz),
+            id="moltbook_daily"
+        )
+        
+        # Moltbook weekly summary - Sunday 20:00 WIB
+        self.scheduler.add_job(
+            self.post_weekly_moltbook,
+            CronTrigger(day_of_week='sun', hour=20, minute=0, timezone=jakarta_tz),
+            id="moltbook_weekly"
+        )
+        
         self.scheduler.start()
-        logger.info("Plant scheduler started with 12 jobs (9 messages + 2 insights + 1 comparison)")
+        logger.info("Plant scheduler started with 14 jobs (9 messages + 2 insights + 1 comparison + 2 moltbook)")
     
     def stop(self):
         self.scheduler.shutdown()
         logger.info("Plant scheduler stopped")
+    
+    async def post_daily_moltbook(self):
+        """Generate and post daily Moltbook update"""
+        try:
+            from app.services.moltbook import moltbook_service
+            from app.services.influxdb import influxdb_service
+            from app.services.growth_phase import get_current_phase
+            from app.services.growth_comparator import growth_comparator
+            from app.routes.dashboard import get_experiment_day
+            
+            logger.info("Generating daily Moltbook post...")
+            
+            # Get experiment day
+            experiment_day = get_experiment_day()
+            
+            # Get current phase
+            phase = get_current_phase()
+            phase_name = phase.get("name", "unknown")
+            
+            # Get 24h sensor stats
+            hourly_data = influxdb_service.get_hourly_stats(self.device_id, hours=24)
+            
+            if not hourly_data:
+                logger.warning("No sensor data for Moltbook daily post")
+                return
+            
+            # Calculate daily averages
+            sensor_stats = {}
+            active_sensors = ["temperature", "humidity", "light", "soil_moisture"]
+            
+            for sensor in active_sensors:
+                sensor_data = [r for r in hourly_data if r["sensor_type"] == sensor]
+                if sensor_data:
+                    values = [r["value"] for r in sensor_data if r["value"] is not None]
+                    if values:
+                        sensor_stats[sensor] = {
+                            "avg": sum(values) / len(values),
+                            "min": min(values),
+                            "max": max(values)
+                        }
+            
+            # Get GDD and health score
+            comparison = self.latest_comparison
+            gdd = comparison.get("accumulated_gdd", 0) if comparison else 0
+            health_score = comparison.get("overall_score", 0) if comparison else 0
+            
+            # Determine notable observation
+            notable = "All stable"
+            
+            # Check for anomalies from latest insight
+            if self.latest_insight:
+                analysis = self.latest_insight.get("analysis", {})
+                anomalies = analysis.get("anomalies", [])
+                if anomalies:
+                    notable = anomalies[0].get("description", "Anomaly detected")
+            
+            # Post to Moltbook
+            result = moltbook_service.post_daily_update(
+                experiment_day=experiment_day,
+                phase_name=phase_name,
+                sensor_data=sensor_stats,
+                gdd=gdd,
+                health_score=health_score,
+                notable=notable
+            )
+            
+            if result and result.get("success"):
+                logger.info(f"Daily Moltbook post successful: Day {experiment_day}")
+            else:
+                logger.error(f"Daily Moltbook post failed: {result}")
+        
+        except Exception as e:
+            logger.error(f"Error in post_daily_moltbook: {e}")
+    
+    async def post_weekly_moltbook(self):
+        """Generate and post weekly Moltbook summary"""
+        try:
+            from app.services.moltbook import moltbook_service
+            from app.services.influxdb import influxdb_service
+            from app.services.growth_phase import get_current_phase
+            from app.routes.dashboard import get_experiment_day
+            
+            logger.info("Generating weekly Moltbook summary...")
+            
+            # Calculate week number
+            experiment_day = get_experiment_day()
+            week_num = (experiment_day // 7) + 1
+            
+            # Get current phase
+            phase = get_current_phase()
+            phase_name = phase.get("name", "unknown")
+            
+            # Get 7-day sensor stats
+            hourly_data = influxdb_service.get_hourly_stats(self.device_id, hours=168)
+            
+            if not hourly_data:
+                logger.warning("No sensor data for Moltbook weekly post")
+                return
+            
+            # Calculate weekly stats
+            weekly_stats = {}
+            active_sensors = ["temperature", "humidity", "light", "soil_moisture"]
+            
+            for sensor in active_sensors:
+                sensor_data = [r for r in hourly_data if r["sensor_type"] == sensor]
+                if sensor_data:
+                    values = [r["value"] for r in sensor_data if r["value"] is not None]
+                    if values:
+                        weekly_stats[sensor] = {
+                            "avg": sum(values) / len(values),
+                            "min": min(values),
+                            "max": max(values)
+                        }
+            
+            # Get GDD and health score from latest comparison
+            comparison = self.latest_comparison
+            weekly_stats["gdd_accumulated"] = comparison.get("accumulated_gdd", 0) if comparison else 0
+            weekly_stats["health_score"] = comparison.get("overall_score", 0) if comparison else 0
+            
+            # Get findings from latest insight
+            findings = []
+            anomalies = []
+            
+            if self.latest_insight:
+                analysis = self.latest_insight.get("analysis", {})
+                sensors_data = analysis.get("sensors", {})
+                
+                for sensor_name, stats in sensors_data.items():
+                    trend = stats.get("trend", "stable")
+                    avg = stats.get("avg", 0)
+                    findings.append(f"{sensor_name.replace('_', ' ').title()}: {avg:.1f} avg, trend {trend}")
+                
+                anomaly_list = analysis.get("anomalies", [])
+                for anomaly in anomaly_list:
+                    anomalies.append(anomaly.get("description", "Anomaly detected"))
+            
+            # Next week expectations
+            next_expectations = f"Continue {phase_name} phase monitoring"
+            if phase_name == "germination":
+                next_expectations = "Cotyledon emergence expected, transition to Seedling phase"
+            elif phase_name == "seedling":
+                next_expectations = "First true leaves development, continue light exposure"
+            elif phase_name == "vegetative":
+                next_expectations = "Rapid growth phase, monitor for flowering initiation"
+            
+            # Post to Moltbook
+            result = moltbook_service.post_weekly_summary(
+                week_num=week_num,
+                phase_name=phase_name,
+                weekly_stats=weekly_stats,
+                findings=findings[:3],
+                anomalies=anomalies[:2],
+                next_expectations=next_expectations
+            )
+            
+            if result and result.get("success"):
+                logger.info(f"Weekly Moltbook post successful: Week {week_num}")
+            else:
+                logger.error(f"Weekly Moltbook post failed: {result}")
+        
+        except Exception as e:
+            logger.error(f"Error in post_weekly_moltbook: {e}")
 
 plant_scheduler = PlantScheduler()
