@@ -91,16 +91,29 @@ async def set_manual_light(request: ManualLightRequest):
         from datetime import datetime
         import pytz
         
-        # Create manual sensor data
+        # Get current timestamp as Unix timestamp (seconds)
+        now = datetime.now(pytz.timezone('Asia/Jakarta'))
+        unix_timestamp = int(now.timestamp())
+        
+        # Get latest sensor data for other sensors
+        from app.services.influxdb import influxdb_service
+        latest = influxdb_service.get_latest_readings("PVL-001")
+        
+        # Create complete sensor data with manual light override
         manual_data = {
             "device_id": "PVL-001",
-            "timestamp": datetime.now(pytz.timezone('Asia/Jakarta')).isoformat(),
+            "timestamp": unix_timestamp,
             "sensors": {
+                "temperature": latest.get("temperature", {"value": 27.0, "unit": "°C", "status": "normal"}),
+                "humidity": latest.get("humidity", {"value": 65.0, "unit": "%", "status": "normal"}),
                 "light": {
                     "value": request.light_value,
                     "unit": "lux",
-                    "status": "manual_override"
-                }
+                    "status": "normal"
+                },
+                "soil_moisture": latest.get("soil_moisture", {"value": 65.0, "unit": "%", "status": "normal"}),
+                "tds": latest.get("tds", {"value": 0, "unit": "ppm", "status": "normal"}),
+                "ph": latest.get("ph", {"value": 0, "unit": "", "status": "normal"})
             }
         }
         
